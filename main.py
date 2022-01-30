@@ -8,12 +8,18 @@ from prometheus_client import start_http_server, Summary, Gauge
 # Based on https://pypi.org/project/prometheus-flask-exporter/
 sensor_base_dir = "/sys/bus/w1/devices/"
 
+SENSORS = {
+    '28-00000db6fb7e': '',
+    '28-00000db717f0': '',
+    '28-00000db81779': '',
+    '28-00000db870d0': '',
+}
 
 if __name__ == "__main__":
     # Prometheus Server Stuffs
     REQUEST_TIME = Summary('request_processing_seconds', 'Time spent processing requests')
     start_http_server(9200)
-    gauge = Gauge('temperature', 'Temperature', ['sensor_name'])
+    gauge = Gauge('temperature', 'Temperature', ['sensor_name', 'alias'])
 
     @REQUEST_TIME.time()
     def process_request():
@@ -34,9 +40,14 @@ if __name__ == "__main__":
 
         ds18b20_folders = glob(sensor_base_dir + '28*')
         for folder in ds18b20_folders:
-            print(folder + ": " + read_temp_raw(folder))
-
-            gauge.labels(str(folder.replace('/sys/bus/w1/devices/', ''))).set(read_temp_raw(folder))
+            temperature = read_temp_raw(folder)
+            print(folder + ": " + temperature)
+            sensor_name = folder.replace('/sys/bus/w1/devices/', '')
+            try:
+                sensor_alias = SENSORS[folder]
+                gauge.labels(sensor_name, sensor_alias).set(temperature)
+            except KeyError:
+                gauge.labels(sensor_name).set(temperature)                
 
         print(ds18b20_folders)
         time.sleep(60)
